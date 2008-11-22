@@ -1,0 +1,333 @@
+<html>
+
+<head>
+<title>YAMR</title>
+</head>
+
+<body>
+
+<h1>YAMR</h1>
+<p>Author: Tim Maxwell<p>
+
+<h2>Table of Contents</h2>
+<a href="#whatis">What is YAMR?</a><br>
+<a href="#installation">Installing YAMR</a><br>
+<a href="#example">Using YAMR to build a simple C project</a><br>
+<a href="#examplesteps">Step by step through the example</a><br>
+<a href="#recompilation">YAMR does not recompile unless necessary</a><br>
+<a href="#more">More builders</a><br>
+<a href="#custom">Writing your own builders</a><br>
+<a href="#extras">Convenience Functions</a><br>
+
+<a name="whatis"><h2>What is YAMR?</h2></a>
+<p>YAMR is Yet Another Make Replacement. It is a build tool that performs the same function
+as Make. It is implemented as a pure Python module.</p>
+
+<a name="installation"><h2>Installing YAMR</h2></a>
+<p>To install YAMR:</p>
+<kbd>
+$ cd /path/to/yamr/download/<br>
+$ python setup.py install
+</kbd>
+
+<a name="example"><h2>Using YAMR to build a simple C project</h2></a>
+
+<p>The best way to learn is by examples, so here's a simple example of how to use YAMR. Suppose that
+we are building a tool called 'Foo', using three C source files: 'foo.c', 'bar.c', and 'baz.c'.</p>
+
+<p>We would start by making a new Python script in the same directory with the source files.
+YAMR doesn't care what the script is called - we'll call ours "build.py". </p>
+
+<code>
+#!/usr/bin/env python<br>
+# build.py - build script for Foo<br>
+<br>
+from yamr import *<br>
+SetupYAMR()<br>
+<br>
+sources = [File("foo.c"), File("bar.c"), File("baz.c")]<br>
+<br>
+flags = "-Wall"<br>
+objects = [Compile([x],flags) for x in sources]<br>
+Foo = Executable(objects, flags)<br>
+<br>
+Export(Foo, "Foo")
+</code>
+
+<p>To build our project, we would navigate to the project directory and type "./build.py".
+The output would look something like this:</p>
+<samp>
+- gcc -c -o "yamrbuild/cf03372cde0e1c1fa75caad7448fbd45" foo.c -Wall<br>
+- gcc -c -o "yamrbuild/b0a67a710b557cfb53c7ffef5a5d7fe0" bar.c -Wall<br>
+- gcc -c -o "yamrbuild/d2d54864d96122c88a69a786fe6248a1" baz.c -Wall<br>
+- gcc -o "yamrbuild/48bc2052494d6097473a0adc48301e03" yamrbuild/cf03372cde0e1c1fa75caad7448fbd45 yamrbuild/b0a67a710b557cfb53c7ffef5a5d7fe0 yamrbuild/d2d54864d96122c88a69a786fe6248a1 -Wall<br>
+- copy yamrbuild/48bc2052494d6097473a0adc48301e03 Foo<br>
+[YAMR: Finished exporting to "Foo".]
+</samp>
+
+<p>Two new things will have appeared in our project directory. The first is a directory, called
+"yamrbuild". YAMR stores intermediate build products in this directory. The other is the result of
+the build, called "Foo".</p>
+
+<a name="examplesteps"><h2>Step by step through the example</h2></a>
+
+<p>These two lines must be called before any other YAMR commands:</p>
+<code>from yamr import *<br>
+SetupYAMR()</code>
+<p>The first line imports the YAMR module from wherever it was installed. The second line
+initializes YAMR and creates the "yamrbuild" directory if it does not already exist.</p>
+
+<p>The next line specifies what the source files for our project are:</p>
+<code>sources = [File("foo.c"), File("bar.c"), File("baz.c")]</code>
+<p>The "File" function takes the name of a source file and creates a <em>token</em>. A token is a
+Python object that describes how to generate a given file. This line creates three tokens, one for
+each of the source files in our project. It puts those tokens into a list called 'sources'.</p>
+
+<p>The next three lines build our source tokens into a final product:</p>
+<code>
+flags = "-Wall"<br>
+objects = [Compile([x],flags) for x in sources]<br>
+Foo = Executable(objects, flags)<br>
+</code>
+<p>Compile() is a <em>builder</em> - a function that converts one or more tokens and parameters into
+another token. Compile() takes a list of input tokens and a string with compiler flags. It returns
+a token for an object file created from the input file. We create object file tokens for each of
+our input files, and then pass those object file tokens to Executable(). Executable() is another 
+builder. It converts a list of object file tokens into a token for a final executable file. Note
+that no actual compilation is done at this stage - we are only creating tokens to represent
+the stages of compilation.</p>
+
+<p>The actual compilation is performed by the final line:</p>
+<code>Export(Foo, "Foo")</code>
+<p>The Export() function performs the compilation using the instructions stored in the token called
+Foo. It saves the result of the compilation to a file called "Foo" in the same directory
+as the build script. As it performs the compilation, it prints messages to standard output. When
+it is done, it writes <code>[YAMR: Finished exporting to "Foo".]</code>.</p>
+
+<a name="recompilation"><h2>YAMR does not recompile unless necessary</h2></a>
+
+<p>If you run the build script again, you will only get a single line:</p>
+<samp>[YAMR: Finished exporting to "Foo".]</samp>
+<p>This is because nothing has changed since the last time Foo was compiled, so YAMR doesn't need
+to do anything. If you change the file "foo.c" and run "./build.py" a third time, you will see:</p>
+<samp>- remove yamrbuild/cf03372cde0e1c1fa75caad7448fbd45<br>
+- gcc -c -o "yamrbuild/cf03372cde0e1c1fa75caad7448fbd45" foo.c -Wall<br>
+- remove yamrbuild/48bc2052494d6097473a0adc48301e03<br>
+- gcc -o "yamrbuild/48bc2052494d6097473a0adc48301e03" yamrbuild/cf03372cde0e1c1fa75caad7448fbd45 yamrbuild/b0a67a710b557cfb53c7ffef5a5d7fe0 yamrbuild/d2d54864d96122c88a69a786fe6248a1 -Wall<br>
+- remove Foo<br>
+- copy yamrbuild/48bc2052494d6097473a0adc48301e03 Foo<br>
+[YAMR: Finished exporting to "Foo".]</samp>
+<p>YAMR rebuilds what is necessary and no more.</p>
+
+<a name="more"><h2>More builders</h2></a>
+
+<p>So far we have only seen three builders: File(), Compile(), and Executable(). There are several
+other built-in builders available. Here are some examples:</p>
+
+<h3>SharedLibrary() and StaticLibrary()</h3>
+<p>SharedLibrary() and StaticLibrary() work like Executable(), except that they produce a shared or
+static library. 
+
+<h3>ExecuteCommand()</h3>
+<p>If you want to execute an arbitrary command that there isn't an existing builder for, you can use
+ExecuteCommand(). ExecuteCommand() takes two arguments: a format string and a list of source files.
+The format string must be a Python string that contains "%(output)s" and "%(input)s". "%(output)s"
+will be substituted with the output filename that YAMR wants the result of the operation written to.
+"%(input)s" will be substituted with a space-separated list of input filenames.</p>
+<p>For example, if you wanted to substitute every instance of "#FF0000" in a file with "#00FF00"
+using <tt>sed</tt>, you could write:</p>
+<code><pre>
+red = File("red-file.html")
+green = ExecuteCommand("sed s/#FF0000/#00FF00/ %(input)s > %(output)s", [red])
+</pre></code>
+
+<h3>MkDir()</h3>
+<p>The MkDir() builder takes one argument: a dictionary mapping the names of files to tokens. It
+generates a token corresponding to a directory containing those tokens. For example, if you wanted
+to compile five command-line tools and produce a directory containing all five, you could write
+a build script like this:</p>
+<code><pre>#!/usr/bin/env python
+from yamr import *
+SetupYAMR()
+
+tool_names = ["foo", "bar", "baz", "spam", "eggs"]
+
+tooldict = {}
+for tool in tool_names:
+	source = File(tool+".c")
+	object = Compile([source], "-Wall")
+	executable = Executable([object])
+	tooldict[tool] = executable
+
+directory = MkDir(tooldict)
+Export(directory, "Tools")
+</pre></code>
+
+<a name="custom"><h2>Writing your Own Builders</h2></a>
+<p>Sometimes ExecuteCommand() just isn't quite powerful enough for what you want to do, or you want
+a more complicated interface than a simple list of input and output files. In that case, you can
+write your own builder class.</p>
+
+<h3>An example: the SED builder</h3>
+
+<p>As an example, we will look at an implementation for a simple wrapper around the Unix
+command-line tool <tt>sed</tt>. When we are done, we will be able to use our builder by calling
+<code>SED(pattern, input)</code>. The SED builder can be implemented as follows:</p>
+<code><pre>
+class SED(Builder):
+	def start(self, pattern, input):
+		self.pattern = pattern
+		self.input = input
+		self.output = Token(self)
+		
+		self.set_intokens([self.input])
+		self.set_outtokens([self.output])
+		
+		return self.output
+	
+	def build(self):
+		output = self.output.filename()
+		input = self.input.complete()
+		
+		DoCommand('sed "%s" %s > %s' % (self.pattern, input, output))
+		
+		self.output.finished()
+	
+	def identify(self):
+		return "SED('%s',%s)" % (self.pattern.encode("string-escape"),self.input.identify())
+</pre></code>
+
+<h3>The start() method</h3>
+
+<p>Every builder must be a subclass of the class <var>Builder</var>. Builder classes do not have an
+<var>__init__</var> method; instead, the corresponding method is called <var>start()</var>.
+<var>start()</var> works like <var>__init__()</var> except that, while <var>__init__()</var> has
+no return value, <var>start()</var> returns one or more tokens. Let us step through our
+<var>start()</var> method:
+
+<code><pre>
+self.pattern = pattern
+self.input = input
+</pre></code>
+<p>These lines simply record the input and pattern values in <var>self</var> for later use.</p>
+
+<code><pre>
+self.output = Token(self)
+</pre></code>
+<p>This line creates a new token. <var>self</var> is passed as an argument to the token so that the
+token knows that <var>self</var> is the builder that is responsible for building the results of that
+token. When the token's results need to be built, then the builder's <var>build()</var> method
+will be called; more on this later.</p>
+
+<code><pre>
+self.set_intokens([self.input])
+self.set_outtokens([self.output])
+</pre></code>
+<p>These lines tell YAMR what tokens this builder uses as inputs and what tokens are produced as
+outputs. The list of input tokens is used to calculate whether or not it is necessary to rebuild
+this builder.</p>
+
+<code><pre>
+return self.output
+</pre></code>
+<p>This line simply returns the output token so that it can be used by our build script.</p>
+
+<p>Note that the names <var>self.input</var> and <var>self.output</var> are completely arbitrary.
+You could call them anything without changing the result.</p>
+
+<h3>The build() method</h3>
+
+<p>The <var>start()</var> method is called when the user calls <var>SED()</var>, but the next method, the
+<var>build()</var> method, is not called until the actual build is done when <var>Export()</var> is
+called. The <var>build()</var> method does the actual work of calling <tt>sed</tt>. The job of the
+build method is to use the input tokens and parameters to finish the output tokens.</p>
+
+<code><pre>
+output = self.output.filename()
+</pre></code>
+<p>The <var>filename()</var> method returns the path where the result of the computation should be
+put.</p>
+
+<code><pre>
+input = self.input.complete()
+</pre></code>
+<p>Every token has a method called <var>complete()</var>. <var>complete()</var> tells the token to
+build itself, if necessary. The return value of <var>complete()</var> is a pathname where the
+result can be found.</p>
+
+<code><pre>
+DoCommand('sed "%s" %s > %s' % (self.pattern, input, output))
+</pre></code>
+<p>This line performs the actual call to <tt>sed</tt>. As an input file, it passes the file path
+where <var>self.input</var> stored its results. As an output file, it passes the path where
+<var>self.output</var> wants its results to be put. <var>DoCommand()</var> is a convenience function
+that runs a shell command as well as printing that command to the screen so that the user knows what
+is happening.</p>
+
+<code><pre>
+self.output.finished()
+</pre></code>
+<p>The <var>finished()</var> method informs the output token that the operation is finished and the
+results should be stored at <var>output.filename()</var></p>
+
+<h3>The identify() method</h3>
+
+<p>The final method implemented by the <var>SED</var> class is <var>identify()</var>. YAMR uses
+<var>identify()</var> to identify the same builders over multiple runs of the script so that it
+can cache intermediate results between runs. The job of <var>identify()</var> is to return a unique
+string; the string must be the same every time that the build script is run, but different from
+the string returned by any other builder instance.</p>
+
+<code><pre>
+return "SED('%s',%s)" % (self.pattern.encode("string-escape"),self.input.identify())
+</pre></code>
+<p>Our builder produces a unique string using its substitution pattern and the
+<var>identify()</var> method of its input. This is a reliable technique for generating constistent
+unique identifying strings. As a convention, the return value of <var>identify()</var> should be
+human-readable, but this isn't necessary.</p>
+
+<p>MD5 hashes of the <var>identify()</var> strings are used to generate the temporary filenames for the files
+stored in the <tt>yamrbuild</tt> directory. This is why they aren't human-readable.</p>
+
+<h3>Using the SED builder</h3>
+
+<p>The <tt>sed</tt> builder is now complete. To demonstrate how it can be used, we can rewrite our
+previous ExecuteCommand() example to use SED() instead:</p>
+<code><pre>
+red = File("red-file.html")
+green = SED("s/#FF0000/#00FF00/", red)
+</pre></code>
+
+<h3>Advanced builder methods</h3>
+
+<p>If you want finer control over when your builder is recompiled, you can override the
+<var>changetime()</var> method. The return value of <var>changetime()</var> should be a datetime
+instance with the last time that the builder's output changed. <var>changetime()</var> will not
+be called if the builder has never been run.</p>
+
+<a name="extras"><h2>Convenience Functions</h2></a>
+
+<p>Often you want to perform an operation on "all of the C files in a directory", or "every file with
+a name of the form tool_*.c", or something similar. YAMR provides convenient functions to perform
+such operations. The functions are as follows:</p>
+
+<h3>Glob()</h3>
+<p>The <var>Glob()</var> function takes a shell wildcard pattern and returns a list of tokens, one
+for each file matching the pattern. For example, you could get a list of the C files in the
+directory by writing:</p>
+<code>sources = Glob("*.c")</code>
+<p>This is equivalent to specifying each of the files manually:</p>
+<code>sources = [File("file1.c"), File("file2.c"), ...]</code>
+
+<h3>GlobDict()</h3>
+<p><var>GlobDict()</var> is similar to <var>Glob()</var> except that it preserves the names of the
+files by returning a dictionary instead of a list.</p>
+
+<h3>GlobTree()</h3>
+<p><var>GlobTree(root, pattern="*")</var> returns a token corresponding to a copy of the file tree
+starting at <var>root</var>, except that only files which match the wildcard <var>pattern</var>
+are matched. For example, you could extract all of the <tt>.tga</tt> files in a tree using:</p>
+<code>tgas = GlobTree("images", "*.tga")</code>
+
+</body>
+</html>
