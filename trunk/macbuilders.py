@@ -34,13 +34,14 @@ specified, then it will be passed along with the '-bundle_loader' flag to GCC.""
 	return CCompiler('gcc -o "%%(output)s" -bundle %%(input)s %s' % flags, inputs, keyedinputs)
 
 class InstallNameTool(Builder):
-	"""InstallNameTool(source, translations) -> Token
-Provides an interface to "install_name_tool -change". "source" should be an executable or shared
-library to be modified. "translations" should be a dictionary that maps the original names of shared
-libraries to the names that should be inserted instead."""
-	def start(self, source, translations):
+	"""InstallNameTool(source, changes={}, id=None) -> Token
+Provides an interface to "install_name_tool -change" and "install_name_tool -id". "source" should be
+an executable or shared library to be modified. "changes" provides a set of key-value pairs to be
+passed with "-change", and "id" (if not None) provides a new name to be passed with "-id"."""
+	def start(self, source, changes={}, id=None):
 		self.source = source
-		self.translations = translations
+		self.changes = changes
+		self.id = id
 		self.result = Token(self)
 		
 		self.set_intokens([self.source])
@@ -54,12 +55,14 @@ libraries to the names that should be inserted instead."""
 		DoCopy(inpath, outpath) # install_name_tool operates in place
 		
 		command = "install_name_tool"
-		for old,new in self.translations.iteritems():
+		for old,new in self.changes.iteritems():
 			command += " -change %s %s" % (old,new)
+		if self.id is not None:
+			command += " -id %s"%self.id
 		command += " " + outpath
 		DoCommand(command)
 		
 		self.result.finished()
 	
 	def identify(self):
-		return "installnametool(%s,%s)" % (self.source.identify(), self.translations)
+		return "installnametool(%s,%s,%s)" % (self.source.identify(), self.changes, self.id)

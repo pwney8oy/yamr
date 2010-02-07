@@ -74,6 +74,7 @@ class CCompiler(ExecuteCommand):
 CCompiler is a builder that scans its input files for dependencies and automatically rebuilds
 if a dependency has changed."""
 	
+	# "#import" is a preprocessor command used by Objective-C
 	dependency_re = re.compile(r'#(?:include|import)\s+"([^"]+)"\n')
 	i_flag_re = re.compile(r"-I[ ]?((?:[^ \\]+|[\\][ \\])+)")
 	ipath_flag_re = re.compile(r"-ipath[ ]?((?:[^ \\]+|[\\][ \\])+)")
@@ -124,18 +125,25 @@ if a dependency has changed."""
 				
 		return most_recent_change
 
-def Compile(inputs, flags="", keyedinputs={}):
-	"""Compile(inputs, flags="", keyedinputs={}) -> Token
+def CompileC(inputs, flags="", keyedinputs={}):
+	"""CompileC(inputs, flags="", keyedinputs={}) -> Token
 Compiles a group of source files into an object file using GCC. The input files will be
 automatically scanned for C "#include" directives."""
 	return CCompiler('gcc -c -o "%%(output)s" %%(input)s %s' % flags, inputs, keyedinputs)
+Compile = CompileC
+
+def CompileCPP(inputs, flags="", keyedinputs={}):
+	"""CompileCPP(inputs, flags="", keyedinputs={}) -> Token
+Compiles a group of source files into an object file using G++. The input files will automatically
+be scanned for C "#include" directives."""
+	return CCompiler('g++ -c -o "%%(output)s" %%(input)s %s' % flags, inputs, keyedinputs)
 
 def Executable(inputs, flags="", keyedinputs={}):
 	"""Executable(inputs, flags="", keyedinputs={}) -> Token
 Compiles a group of object files into an executable using GCC."""
 	# in theory, the arguments to Executable() should be object files, but in practice people will
 	# pass source files. so we use CCompiler() instead of ExecuteCommand().
-	return CCompiler('gcc -o "%%(output)s" %%(input)s %s' % flags, inputs, keyedinputs)
+	return CCompiler('g++ -o "%%(output)s" %%(input)s %s' % flags, inputs, keyedinputs)
 
 def SharedLibrary(inputs, flags="", keyedinputs={}):
 	"""SharedLibrary(inputs, flags="", keyedinputs={}) -> Token
